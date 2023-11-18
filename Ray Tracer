@@ -1,0 +1,108 @@
+#include <glm/glm.hpp>
+#include <vector>
+#include <iostream>
+#include <fstream>
+#include <limits>
+#include <cmath>
+
+// Define a simple structure for a ray
+struct Ray {
+    glm::vec3 origin;
+    glm::vec3 direction;
+
+    Ray(const glm::vec3& o, const glm::vec3& d) : origin(o), direction(glm::normalize(d)) {}
+};
+
+// Base class for any object in the scene
+class SceneObject {
+public:
+    virtual bool intersect(const Ray& ray, float& distance) const = 0;
+    // Add more virtual functions for material properties, etc.
+};
+
+// Sphere object
+class Sphere : public SceneObject {
+private:
+    glm::vec3 center;
+    float radius;
+
+public:
+    Sphere(const glm::vec3& c, float r) : center(c), radius(r) {}
+
+    bool intersect(const Ray& ray, float& distance) const override {
+        // Ray-sphere intersection logic
+        glm::vec3 oc = ray.origin - center;
+        float a = glm::dot(ray.direction, ray.direction);
+        float b = 2.0f * glm::dot(oc, ray.direction);
+        float c = glm::dot(oc, oc) - radius * radius;
+        float discriminant = b * b - 4 * a * c;
+        if (discriminant < 0) {
+            return false; // no intersection
+        }
+        // Find the nearest point of intersection
+        float dist = (-b - sqrt(discriminant)) / (2.0f * a);
+        if (dist < 0) {
+            return false; // the sphere is behind the ray
+        }
+        distance = dist;
+        return true;
+    }
+};
+
+// Function to trace a ray and determine its color
+glm::vec3 trace(const Ray& ray, const std::vector<SceneObject*>& objects) {
+    float closestDistance = std::numeric_limits<float>::max();
+    glm::vec3 color(0); // Default color is black
+
+    for (const auto& object : objects) {
+        float distance = 0.0f;
+        if (object->intersect(ray, distance)) {
+            if (distance < closestDistance) {
+                closestDistance = distance;
+                // This is where you would calculate the actual color
+                color = glm::vec3(1); // Just setting a placeholder color for now
+            }
+        }
+    }
+
+    return color; // Return the color for the closest intersecting object
+}
+
+// Main rendering function
+void render(int width, int height) {
+    std::vector<SceneObject*> objects;
+
+    // Create a test sphere
+    Sphere* sphere = new Sphere(glm::vec3(0, 0, -5), 1);
+    objects.push_back(sphere);
+
+    std::ofstream out("output.ppm");
+    out << "P3\n" << width << ' ' << height << "\n255\n";
+
+    for (int j = 0; j < height; ++j) {
+        for (int i = 0; i < width; ++i) {
+            // Simple camera setup
+            float x = (2 * (i + 0.5f) / (float)width - 1) * width / (float)height;
+            float y = (1 - 2 * (j + 0.5f) / (float)height);
+            Ray ray(glm::vec3(0), glm::vec3(x, y, -1));
+            glm::vec3 color = trace(ray, objects);
+            out << (int)(color.r * 255) << ' '
+                << (int)(color.g * 255) << ' '
+                << (int)(color.b * 255) << '\n';
+        }
+    }
+
+    out.close();
+    // Clean up
+    delete sphere;
+}
+
+int main() {
+    const int imageWidth = 800;
+    const int imageHeight = 600;
+
+    render(imageWidth, imageHeight);
+
+    std::cout << "Done!" << std::endl;
+    return 0;
+}
